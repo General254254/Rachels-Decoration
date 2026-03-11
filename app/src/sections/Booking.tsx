@@ -1,281 +1,192 @@
-import { useEffect, useRef, useState } from 'react';
-import gsap from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { Send, Calendar, User, Mail, MessageSquare, Tag, CheckCircle } from 'lucide-react';
-import { bookingConfig } from '../config';
-
-gsap.registerPlugin(ScrollTrigger);
+import { useEffect, useState } from 'react';
+import { Phone, Mail, MapPin, Clock } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const Booking = () => {
-  const sectionRef = useRef<HTMLElement>(null);
-  const formRef = useRef<HTMLFormElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const triggersRef = useRef<ScrollTrigger[]>([]);
-  const [isSubmitted, setIsSubmitted] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
+    firstName: '',
+    lastName: '',
     phone: '',
+    email: '',
     eventType: '',
     eventDate: '',
-    message: '',
+    location: '',
+    message: ''
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+  const [markerInstance, setMarkerInstance] = useState<L.Marker | null>(null);
 
   useEffect(() => {
-    const section = sectionRef.current;
-    const form = formRef.current;
-    const content = contentRef.current;
-    if (!section || !form || !content) return;
+    // Initialize map only once
+    const mapContainer = document.getElementById('eventMap');
+    if (!mapContainer || mapInstance) return;
 
-    // Content entrance
-    const contentTl = gsap.timeline({
-      scrollTrigger: {
-        trigger: section,
-        start: 'top 60%',
-        toggleActions: 'play none none reverse',
-      },
+    const map = L.map('eventMap').setView([-1.2921, 36.8219], 12);
+    
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; CartoDB',
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(map);
+
+    const customIcon = L.icon({
+      iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23E8448A" stroke="%23fff" stroke-width="1"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>',
+      iconSize: [38, 38],
+      iconAnchor: [19, 38]
     });
 
-    contentTl.fromTo(
-      content,
-      { x: -80, opacity: 0 },
-      { x: 0, opacity: 1, duration: 1, ease: 'expo.out' }
-    );
+    const marker = L.marker([-1.2921, 36.8219], { icon: customIcon }).addTo(map);
 
-    if (contentTl.scrollTrigger) {
-      triggersRef.current.push(contentTl.scrollTrigger);
-    }
-
-    // Form entrance
-    const formTl = gsap.timeline({
-      scrollTrigger: {
-        trigger: section,
-        start: 'top 50%',
-        toggleActions: 'play none none reverse',
-      },
+    map.on('click', (e) => {
+      marker.setLatLng(e.latlng);
+      setFormData(prev => ({
+        ...prev,
+        location: `Coordinates: ${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`
+      }));
     });
 
-    formTl.fromTo(
-      form,
-      { x: 100, rotateY: -18, opacity: 0 },
-      { x: 0, rotateY: 0, opacity: 1, duration: 1, ease: 'expo.out' }
-    );
-
-    if (formTl.scrollTrigger) {
-      triggersRef.current.push(formTl.scrollTrigger);
-    }
+    setMapInstance(map);
+    setMarkerInstance(marker);
 
     return () => {
-      triggersRef.current.forEach(trigger => trigger.kill());
-      triggersRef.current = [];
+      map.remove();
     };
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // Simulate form submission
-    setIsSubmitted(true);
-    setTimeout(() => {
-      setIsSubmitted(false);
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        eventType: '',
-        eventDate: '',
-        message: '',
+  const handleGeoClick = () => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        if (mapInstance && markerInstance) {
+          mapInstance.setView([lat, lng], 15);
+          markerInstance.setLatLng([lat, lng]);
+          setFormData(prev => ({
+            ...prev,
+            location: `Current Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}`
+          }));
+        }
       });
-    }, 3000);
+    } else {
+      alert("Geolocation is not supported by your browser.");
+    }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setIsSuccess(true);
+    }, 1000);
   };
 
   return (
-    <section
-      ref={sectionRef}
-      id="booking"
-      className="relative w-full bg-[#F2B6D2] py-24 overflow-hidden"
-    >
-      {/* Dark stage panel */}
-      <div className="relative z-10 w-full px-6 lg:px-12">
-        <div className="bg-[#0B0B0D] rounded-3xl p-8 md:p-12 lg:p-16 max-w-6xl mx-auto">
-          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20">
-            {/* Left side - Content */}
-            <div ref={contentRef}>
-              {/* Section label */}
-              {bookingConfig.sectionLabel && (
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="w-12 h-px bg-pink" />
-                  <span className="font-mono text-pink text-sm uppercase tracking-[0.3em]">
-                    {bookingConfig.sectionLabel}
-                  </span>
-                </div>
-              )}
-
-              {/* Heading */}
-              {(bookingConfig.headingMain || bookingConfig.headingAccent) && (
-                <h2 className="font-display font-black text-4xl md:text-5xl lg:text-6xl text-white uppercase tracking-tight mb-6">
-                  {bookingConfig.headingMain}
-                  <span className="text-pink">{bookingConfig.headingAccent}</span>
-                </h2>
-              )}
-
-              {/* Description */}
-              {bookingConfig.description && (
-                <p className="font-body text-white/60 text-lg leading-relaxed mb-8">
-                  {bookingConfig.description}
-                </p>
-              )}
-
-              {/* Benefits */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-pink" />
-                  <span className="font-body text-white/70">Free consultation</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-pink" />
-                  <span className="font-body text-white/70">Custom moodboard included</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-pink" />
-                  <span className="font-body text-white/70">Response within 24 hours</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-pink" />
-                  <span className="font-body text-white/70">No obligation quote</span>
-                </div>
-              </div>
+    <>
+      <section className="booking" id="contact">
+        <div>
+          <p className="booking-label reveal visible">Get In Touch</p>
+          <h2 className="booking-title reveal reveal-delay-1 visible">
+            Request a<br/><em className="italic text-pink">Free Quote</em>
+          </h2>
+          <p className="booking-text reveal reveal-delay-2 visible">
+            Tell us about your event and we'll get back to you with a personalised quote and moodboard within 24 hours.
+          </p>
+          
+          <div className="contact-list reveal reveal-delay-2 visible">
+            <div className="contact-item">
+              <Phone size={18} className="contact-icon" /> <strong>0768 020 535</strong>
             </div>
-
-            {/* Right side - Form */}
-            <div className="relative">
-              {isSubmitted ? (
-                <div className="h-full flex flex-col items-center justify-center text-center p-8">
-                  <div className="w-20 h-20 bg-pink rounded-full flex items-center justify-center mb-6">
-                    <CheckCircle className="w-10 h-10 text-white" />
-                  </div>
-                  <h3 className="font-display font-bold text-2xl text-white mb-2">
-                    Thank You!
-                  </h3>
-                  <p className="font-body text-white/60">
-                    We've received your request and will get back to you within 24 hours.
-                  </p>
-                </div>
-              ) : (
-                <form
-                  ref={formRef}
-                  onSubmit={handleSubmit}
-                  className="space-y-5"
-                >
-                  {/* Name */}
-                  <div className="relative">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                    <input
-                      type="text"
-                      name="name"
-                      placeholder="Your Name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      required
-                      className="pl-12"
-                    />
-                  </div>
-
-                  {/* Email & Phone */}
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                      <input
-                        type="email"
-                        name="email"
-                        placeholder="Email Address"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                        className="pl-12"
-                      />
-                    </div>
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                      <input
-                        type="tel"
-                        name="phone"
-                        placeholder="Phone Number"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        className="pl-12"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Event Type & Date */}
-                  <div className="grid md:grid-cols-2 gap-5">
-                    <div className="relative">
-                      <Tag className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                      <select
-                        name="eventType"
-                        value={formData.eventType}
-                        onChange={handleChange}
-                        required
-                        className="pl-12 appearance-none"
-                      >
-                        <option value="">Event Type</option>
-                        <option value="birthday">Birthday</option>
-                        <option value="proposal">Proposal</option>
-                        <option value="school">School Event</option>
-                        <option value="corporate">Corporate</option>
-                        <option value="anniversary">Anniversary</option>
-                        <option value="babyshower">Baby Shower</option>
-                        <option value="other">Other</option>
-                      </select>
-                    </div>
-                    <div className="relative">
-                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/40" />
-                      <input
-                        type="date"
-                        name="eventDate"
-                        value={formData.eventDate}
-                        onChange={handleChange}
-                        className="pl-12"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Message */}
-                  <div className="relative">
-                    <MessageSquare className="absolute left-4 top-4 w-5 h-5 text-white/40" />
-                    <textarea
-                      name="message"
-                      placeholder="Tell us about your vision..."
-                      value={formData.message}
-                      onChange={handleChange}
-                      rows={4}
-                      className="pl-12 resize-none"
-                    />
-                  </div>
-
-                  {/* Submit */}
-                  <button
-                    type="submit"
-                    className="w-full inline-flex items-center justify-center gap-3 px-8 py-4 bg-pink text-white font-body font-semibold text-sm uppercase tracking-wider hover:bg-pink/90 transition-all duration-300 rounded-md hover:-translate-y-1"
-                    data-cursor-hover
-                  >
-                    {bookingConfig.ctaText}
-                    <Send className="w-5 h-5" />
-                  </button>
-                </form>
-              )}
+            <div className="contact-item">
+              <Mail size={18} className="contact-icon" /> <strong>hello@rachelsdecoration.co.ke</strong>
+            </div>
+            <div className="contact-item">
+              <MapPin size={18} className="contact-icon" /> Nairobi, Kenya (citywide service)
+            </div>
+            <div className="contact-item">
+              <Clock size={18} className="contact-icon" /> Mon–Sat · 8am – 7pm
             </div>
           </div>
         </div>
-      </div>
-    </section>
+        
+        <div>
+          {!isSuccess ? (
+            <form className="form-grid" onSubmit={handleSubmit}>
+              <div className="form-group reveal visible">
+                <label>First Name</label>
+                <input type="text" name="firstName" placeholder="Jane" required value={formData.firstName} onChange={handleChange} />
+              </div>
+              <div className="form-group reveal reveal-delay-1 visible">
+                <label>Last Name</label>
+                <input type="text" name="lastName" placeholder="Wanjiru" required value={formData.lastName} onChange={handleChange} />
+              </div>
+              <div className="form-group reveal visible">
+                <label>Phone</label>
+                <input type="tel" name="phone" placeholder="07XX XXX XXX" required value={formData.phone} onChange={handleChange} />
+              </div>
+              <div className="form-group reveal reveal-delay-1 visible">
+                <label>Email</label>
+                <input type="email" name="email" placeholder="jane@email.com" value={formData.email} onChange={handleChange} />
+              </div>
+              <div className="form-group reveal visible">
+                <label>Event Type</label>
+                <select name="eventType" required value={formData.eventType} onChange={handleChange} className="appearance-none bg-black/40">
+                  <option value="" disabled>Select service…</option>
+                  <option value="Room Decoration">Room Decoration</option>
+                  <option value="Event Decoration">Event Decoration</option>
+                  <option value="Balloons & Ribbons">Balloons & Ribbons</option>
+                  <option value="Birthday Setup">Birthday Setup</option>
+                  <option value="School Event">School Event</option>
+                  <option value="Surprise Setup">Surprise Setup</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div className="form-group reveal reveal-delay-1 visible">
+                <label>Event Date</label>
+                <input type="date" name="eventDate" required value={formData.eventDate} onChange={handleChange} />
+              </div>
+              <div className="form-group full reveal visible">
+                <label>Pin Your Event Location on the Map</label>
+                <div id="eventMap" className="filter brightness-90 saturate-75"></div>
+                <p className="map-note">Click anywhere on the map to drop a pin at your event location, or use the button below.</p>
+                <button type="button" className="geo-btn" onClick={handleGeoClick}>Use My Current Location</button>
+              </div>
+              <div className="form-group full reveal visible">
+                <label>Location / Venue</label>
+                <input type="text" name="location" placeholder="Westlands, Nairobi…" value={formData.location} onChange={handleChange} />
+              </div>
+              <div className="form-group full reveal reveal-delay-1 visible">
+                <label>Your Vision / Message</label>
+                <textarea name="message" placeholder="Tell us about your event, theme, colours, or any special requests…" value={formData.message} onChange={handleChange}></textarea>
+              </div>
+              <div className="form-group full reveal reveal-delay-2 visible">
+                <button type="submit" disabled={isSubmitting} className="form-submit">
+                  {isSubmitting ? 'Sending...' : 'Send My Request ✦'}
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="form-success text-center p-8 text-[#5fdb9c] text-sm tracking-wide bg-white/5 rounded-md border border-white/10" style={{ display: 'block' }}>
+              ✅ Thank you! We've received your request and will be in touch within 24 hours.
+            </div>
+          )}
+        </div>
+      </section>
+      
+      <hr className="divider" />
+    </>
   );
 };
 
